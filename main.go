@@ -24,26 +24,26 @@ func (s *Store) Put (key, value string, ttl int) {
 }
 
 func (s *Store) Get (key string) (string, error){
-  s.mu.RLock()
-	defer s.mu.RUnlock()
-	value, err := s.data[key]
-	if !err || time.Now().After(value.expiresAt) {
+	s.mu.RLock()
+	value, ok := s.data[key]
+	if !ok || time.Now().After(value.expiresAt) {
 		s.mu.RUnlock()
 		s.mu.Lock()
 		delete(s.data, key)
 		s.mu.Unlock()
-		s.mu.RLock()
-
 		return " ", errors.New("key not found or expired")
 	}
-	return value.val, nil
+	val := value.val
+	s.mu.RUnlock()
+	return val, nil
 }
+
 
 func (s *Store) Delete (key string) error{
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, err := s.data[key]; !err {
+	if _, ok := s.data[key]; !ok {
 		return errors.New("key not found")
 	}
 	delete(s.data, key)
@@ -52,5 +52,36 @@ func (s *Store) Delete (key string) error{
 
 func main(){
 	fmt.Println("This is my attempt at distributed systems")
-	
+
+	store := &Store{
+		data: make(map[string]Item),
+	}
+
+	store.Put("name1", "jhon", 3)
+	store.Put("name2", "alice", 5)
+	store.Put("name3", "bob", 7)
+
+	val, _ := store.Get("name1")
+	fmt.Println("GET", val)
+
+	val, _ = store.Get("name2")
+	fmt.Println("GET", val)
+
+	val, _ = store.Get("name3")
+	fmt.Println("GET", val)
+
+	time.Sleep(4* time.Second)
+
+	val, err := store.Get("name1")
+	fmt.Println("GET", val, err)
+
+	val, err = store.Get("name3")
+	fmt.Println("GET", val, err)
+
+	err = store.Delete("name3")
+	fmt.Println("DELETE", err)
+
+	val, err = store.Get("name3")
+	fmt.Println("GET", val, err)
+
 }
